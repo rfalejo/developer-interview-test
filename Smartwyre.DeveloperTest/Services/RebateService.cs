@@ -8,15 +8,15 @@ namespace Smartwyre.DeveloperTest.Services;
 /// </summary>
 public class RebateService : IRebateService
 {
-    private readonly RebateDataStore _rebateDataStore;
-    private readonly ProductDataStore _productDataStore;
+    private readonly IRebateDataStore _rebateDataStore;
+    private readonly IProductDataStore _productDataStore;
 
     /// <summary>
     /// Constructor for RebateService.
     /// </summary>
     /// <param name="rebateDataStore">Rebate data store instance.</param>
     /// <param name="productDataStore">Product data store instance.</param>
-    public RebateService(RebateDataStore rebateDataStore, ProductDataStore productDataStore)
+    public RebateService(IRebateDataStore rebateDataStore, IProductDataStore productDataStore)
     {
         _rebateDataStore = rebateDataStore;
         _productDataStore = productDataStore;
