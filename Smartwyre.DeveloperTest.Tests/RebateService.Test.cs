@@ -237,6 +237,133 @@ namespace Smartwyre.DeveloperTest.Tests
 
         #endregion
 
+        #region Calculate positive tests
+        [Theory]
+        [InlineData(1.0, 1.0, 1.0)]
+        [InlineData(100.0, 1.0, 1.0)]
+        [InlineData(0.1, 1.0, 1.0)]
+        public void Calculate_ShouldSucceed_ForFixedCashAmount(decimal amount, decimal price, decimal volume)
+        {
+            // Arrange
+            var inMemoryDataStore = new InMemoryRebateDataStore();
+            var mockProductDataStore = new Mock<IProductDataStore>();
+
+            inMemoryDataStore.AddRebate(new Rebate
+            {
+                Identifier = "R1",
+                Incentive = IncentiveType.FixedCashAmount,
+                Amount = amount
+            });
+
+            mockProductDataStore.Setup(m => m.GetProduct(It.IsAny<string>()))
+                .Returns(new Product
+                {
+                    Identifier = "P1",
+                    SupportedIncentives = SupportedIncentiveType.FixedCashAmount,
+                    Price = price,
+                    Uom = "U1"
+                });
+
+            var service = new RebateService(inMemoryDataStore, mockProductDataStore.Object);
+
+            // Act
+            var result = service.Calculate(new CalculateRebateRequest
+            {
+                RebateIdentifier = "R1",
+                ProductIdentifier = "P1",
+                Volume = volume,
+            });
+
+            // Assert
+            Assert.True(result.Success);
+            Assert.True(inMemoryDataStore.HasStoredCalculation(inMemoryDataStore.GetRebate("R1"), amount));
+
+        }
+
+        [Theory]
+        [InlineData(1.0, 1.0, 1.0, 1.0)]
+        [InlineData(0.1, 5.0, 2.0, 1.0)]
+        [InlineData(0.5, 4.0, 2.5, 5)]
+        public void Calculate_ShouldSucceed_ForFixedRateRebate(decimal percentage, decimal price, decimal volume, decimal expectedRebateAmount)
+        {
+            // Arrange
+            var inMemoryDataStore = new InMemoryRebateDataStore();
+            var mockProductDataStore = new Mock<IProductDataStore>();
+
+            inMemoryDataStore.AddRebate(new Rebate
+            {
+                Identifier = "R1",
+                Incentive = IncentiveType.FixedRateRebate,
+                Percentage = percentage
+            });
+
+            mockProductDataStore.Setup(m => m.GetProduct(It.IsAny<string>()))
+                .Returns(new Product
+                {
+                    Identifier = "P1",
+                    SupportedIncentives = SupportedIncentiveType.FixedRateRebate,
+                    Price = price,
+                    Uom = "U1"
+                });
+
+            var service = new RebateService(inMemoryDataStore, mockProductDataStore.Object);
+
+            // Act
+            var result = service.Calculate(new CalculateRebateRequest
+            {
+                RebateIdentifier = "R1",
+                ProductIdentifier = "P1",
+                Volume = volume,
+            });
+
+            // Assert
+            Assert.True(result.Success);
+            Assert.True(inMemoryDataStore.HasStoredCalculation(inMemoryDataStore.GetRebate("R1"), expectedRebateAmount));
+        }
+
+        [Theory]
+        [InlineData(1.0, 1.0, 1.0)]
+        [InlineData(5.0, 5.0, 25.0)]
+        [InlineData(0.2, 0.1, 0.02)]
+        public void Calculate_ShouldSucceed_ForAoumtPerUomRebate(decimal amount, decimal volume, decimal expectedRebateAmount)
+        {
+            // Arrange
+            var inMemoryDataStore = new InMemoryRebateDataStore();
+            var mockProductDataStore = new Mock<IProductDataStore>();
+
+            inMemoryDataStore.AddRebate(new Rebate
+            {
+                Identifier = "R1",
+                Incentive = IncentiveType.AmountPerUom,
+                Amount = amount 
+            });
+
+            mockProductDataStore.Setup(m => m.GetProduct(It.IsAny<string>()))
+                .Returns(new Product
+                {
+                    Identifier = "P1",
+                    SupportedIncentives = SupportedIncentiveType.AmountPerUom,
+                    Price = 100.0m,
+                    Uom = "U1"
+                });
+
+            var service = new RebateService(inMemoryDataStore, mockProductDataStore.Object);
+
+            // Act
+            var result = service.Calculate(new CalculateRebateRequest
+            {
+                RebateIdentifier = "R1",
+                ProductIdentifier = "P1",
+                Volume = volume,
+            });
+
+            // Assert
+            Assert.True(result.Success);
+            Assert.True(inMemoryDataStore.HasStoredCalculation(inMemoryDataStore.GetRebate("R1"), expectedRebateAmount));
+        }
+
+
+        #endregion
         #region Persistence tests
 
         [Fact]
