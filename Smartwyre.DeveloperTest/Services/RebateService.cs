@@ -30,84 +30,67 @@ public class RebateService : IRebateService
 
         var result = new CalculateRebateResult();
 
-        var rebateAmount = 0m;
-
-        switch (rebate.Incentive)
+        // Organize previous if statements
+        if (rebate == null || product == null || !IsRebateSupportedByProduct(rebate, product) || !IsRebateDataValid(rebate) || !IsProductDataValid(product) || !IsRequestDataValid(request))
         {
-            case IncentiveType.FixedCashAmount:
-                if (rebate == null)
-                {
-                    result.Success = false;
-                }
-                else if (!product.SupportedIncentives.HasFlag(SupportedIncentiveType.FixedCashAmount))
-                {
-                    result.Success = false;
-                }
-                else if (rebate.Amount == 0)
-                {
-                    result.Success = false;
-                }
-                else
-                {
-                    rebateAmount = rebate.Amount;
-                    result.Success = true;
-                }
-                break;
-
-            case IncentiveType.FixedRateRebate:
-                if (rebate == null)
-                {
-                    result.Success = false;
-                }
-                else if (product == null)
-                {
-                    result.Success = false;
-                }
-                else if (!product.SupportedIncentives.HasFlag(SupportedIncentiveType.FixedRateRebate))
-                {
-                    result.Success = false;
-                }
-                else if (rebate.Percentage == 0 || product.Price == 0 || request.Volume == 0)
-                {
-                    result.Success = false;
-                }
-                else
-                {
-                    rebateAmount += product.Price * rebate.Percentage * request.Volume;
-                    result.Success = true;
-                }
-                break;
-
-            case IncentiveType.AmountPerUom:
-                if (rebate == null)
-                {
-                    result.Success = false;
-                }
-                else if (product == null)
-                {
-                    result.Success = false;
-                }
-                else if (!product.SupportedIncentives.HasFlag(SupportedIncentiveType.AmountPerUom))
-                {
-                    result.Success = false;
-                }
-                else if (rebate.Amount == 0 || request.Volume == 0)
-                {
-                    result.Success = false;
-                }
-                else
-                {
-                    rebateAmount += rebate.Amount * request.Volume;
-                    result.Success = true;
-                }
-                break;
+            result.Success = false;
+            return result;
         }
 
-        if (result.Success)
+        // The result is guaranteed to be successful at this point
+        result.Success = true;
+
+        var rebateAmount = rebate.Incentive switch
         {
-            _rebateDataStore.StoreCalculationResult(rebate, rebateAmount);
-        }
+            IncentiveType.FixedCashAmount => rebate.Amount,
+            IncentiveType.FixedRateRebate => product.Price * rebate.Percentage * request.Volume,
+            IncentiveType.AmountPerUom => rebate.Amount * request.Volume,
+            _ => 0m
+        };
+
+        _rebateDataStore.StoreCalculationResult(rebate, rebateAmount);
 
         return result;
+    }
+
+    // Method to check if the rebate is supported by the product.
+    private static bool IsRebateSupportedByProduct(Rebate rebate, Product product)
+    {
+        return rebate.Incentive switch
+        {
+            IncentiveType.FixedCashAmount => product.SupportedIncentives.HasFlag(SupportedIncentiveType.FixedCashAmount),
+            IncentiveType.FixedRateRebate => product.SupportedIncentives.HasFlag(SupportedIncentiveType.FixedRateRebate),
+            IncentiveType.AmountPerUom => product.SupportedIncentives.HasFlag(SupportedIncentiveType.AmountPerUom),
+            _ => false,
+        };
+    }
+
+    private static bool IsRebateDataValid(Rebate rebate)
+    {
+        return rebate switch
+        {
+            { Incentive: IncentiveType.FixedCashAmount, Amount: > 0 } => true,
+            { Incentive: IncentiveType.FixedRateRebate, Percentage: > 0 } => true,
+            { Incentive: IncentiveType.AmountPerUom, Amount: > 0 } => true,
+            _ => false,
+        };
+    }
+
+    private static bool IsProductDataValid(Product product)
+    {
+        return product switch
+        {
+            { Price: > 0 } => true,
+            _ => false,
+        };
+    }
+
+    private static bool IsRequestDataValid(CalculateRebateRequest request)
+    {
+        return request switch
+        {
+            { Volume: > 0 } => true,
+            _ => false,
+        };
     }
 }
