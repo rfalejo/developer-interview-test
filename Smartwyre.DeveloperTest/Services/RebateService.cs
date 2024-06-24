@@ -10,16 +10,18 @@ public class RebateService : IRebateService
 {
     private readonly IRebateDataStore _rebateDataStore;
     private readonly IProductDataStore _productDataStore;
+    private readonly IRebateExecutorFactory _rebateExecutorFactory;
 
     /// <summary>
     /// Constructor for RebateService.
     /// </summary>
     /// <param name="rebateDataStore">Rebate data store instance.</param>
     /// <param name="productDataStore">Product data store instance.</param>
-    public RebateService(IRebateDataStore rebateDataStore, IProductDataStore productDataStore)
+    public RebateService(IRebateDataStore rebateDataStore, IProductDataStore productDataStore, IRebateExecutorFactory rebateExecutorFactory)
     {
         _rebateDataStore = rebateDataStore;
         _productDataStore = productDataStore;
+        _rebateExecutorFactory = rebateExecutorFactory;
     }
 
     public CalculateRebateResult Calculate(CalculateRebateRequest request)
@@ -31,22 +33,24 @@ public class RebateService : IRebateService
         var result = new CalculateRebateResult();
 
         // Organize previous if statements
-        if (rebate == null || product == null || !IsRebateSupportedByProduct(rebate, product) || !IsRebateDataValid(rebate) || !IsProductDataValid(product) || !IsRequestDataValid(request))
+        if (rebate == null || product == null || !_rebateExecutorFactory.HasExecutor(rebate.Incentive))
         {
             result.Success = false;
             return result;
         }
 
+        var executor = _rebateExecutorFactory.Resolve(rebate.Incentive);
+
+        if (!IsRebateSupportedByProduct(rebate, product) || !IsRebateDataValid(rebate) || !IsProductDataValid(product) || !IsRequestDataValid(request))
+        {
+            result.Success = false;
+            return result;
+        }
+
+        var calcResult =  executor.CalculateRebate(rebate, product, request);
+
         // The result is guaranteed to be successful at this point
         result.Success = true;
-
-        var rebateAmount = rebate.Incentive switch
-        {
-            IncentiveType.FixedCashAmount => rebate.Amount,
-            IncentiveType.FixedRateRebate => product.Price * rebate.Percentage * request.Volume,
-            IncentiveType.AmountPerUom => rebate.Amount * request.Volume,
-            _ => 0m
-        };
 
         _rebateDataStore.StoreCalculationResult(rebate, rebateAmount);
 
@@ -54,19 +58,18 @@ public class RebateService : IRebateService
     }
 
     // Method to check if the rebate is supported by the product.
-    private static bool IsRebateSupportedByProduct(Rebate rebate, Product product)
+    private bool IsRebateSupportedByProduct(Rebate rebate, Product product)
     {
-        return rebate.Incentive switch
-        {
-            IncentiveType.FixedCashAmount => product.SupportedIncentives.HasFlag(SupportedIncentiveType.FixedCashAmount),
-            IncentiveType.FixedRateRebate => product.SupportedIncentives.HasFlag(SupportedIncentiveType.FixedRateRebate),
-            IncentiveType.AmountPerUom => product.SupportedIncentives.HasFlag(SupportedIncentiveType.AmountPerUom),
-            _ => false,
-        };
+
+        if (_rebateExecutorFactory.HasExecutor(rebate.Incentive))
+            return _rebateExecutorFactory.IsRebateSupportedByProduct(rebate, product
+
+        return false;
     }
 
     private static bool IsRebateDataValid(Rebate rebate)
     {
+
         return rebate switch
         {
             { Incentive: IncentiveType.FixedCashAmount, Amount: > 0 } => true,
